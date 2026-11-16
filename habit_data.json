@@ -1,0 +1,121 @@
+{
+  "habits": [
+    "Brush(Mrng)",
+    "Study(2+ hrs)",
+    "Brush(Night)",
+    "Sleep at 11PM"
+  ],
+  "records": {
+    "2026-11": {
+      "Plan Next Day": {
+        "3": true,
+        "1": true
+      },
+      "Wake up before 7am": {
+        "1": false,
+        "2": false,
+        "15": false,
+        "18": false,
+        "19": false,
+        "16": false,
+        "17": false
+      },
+      "Exercise / Meditate": {
+        "1": false,
+        "2": false,
+        "15": false,
+        "19": false,
+        "16": false,
+        "17": false
+      },
+      "Check DMs / Email": {
+        "1": false,
+        "3": false,
+        "9": false,
+        "15": false,
+        "4": false,
+        "16": true,
+        "17": false
+      },
+      "Feel Gratitude": {
+        "1": true,
+        "2": true
+      },
+      "Learn New Things": {
+        "1": false,
+        "15": false,
+        "16": false,
+        "17": false
+      },
+      "Sleep before 12am": {
+        "1": true
+      },
+      "Study (2hrs+)": {
+        "2": false,
+        "1": false,
+        "14": false,
+        "15": false,
+        "19": false,
+        "16": false,
+        "17": false
+      },
+      "Read book / Editorial": {
+        "2": false
+      },
+      "No Sugar / Junk food": {
+        "3": false
+      },
+      "Do Work": {
+        "2": false
+      },
+      "Everything Groomed": {
+        "15": false
+      },
+      "ewrwr": {
+        "16": true
+      },
+      "Brush(Mrng)": {
+        "16": true,
+        "15": false
+      },
+      "Sleep at 11PM": {
+        "16": false
+      },
+      "Study(2+ hrs)": {
+        "16": false,
+        "17": false
+      },
+      "Brush(Night)": {
+        "17": false,
+        "15": false
+      }
+    }
+  },
+  "goal": "Being Productive",
+  "moods": {
+    "2026-11": {}
+  },
+  "bad_habits": [
+    "Slept Late (12am+)"
+  ],
+  "bad_records": {
+    "2026-11": {
+      "Social Media > 2hrs": {
+        "16": false,
+        "17": false
+      },
+      "Junk Food": {
+        "17": false,
+        "16": false
+      },
+      "Skipped Workout": {
+        "17": false,
+        "16": false
+      },
+      "Slept Late (12am+)": {
+        "16": false,
+        "15": true
+      }
+    }
+  }
+}
