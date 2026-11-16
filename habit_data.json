@@ -1,8 +1,12 @@
 {
   "habits": [
     "Brush(Mrng)",
+    "Bath(within 20min)",
+    "Breakfast",
+    "Anxiety Tablet",
+    "Infection tablet",
     "Study(2+ hrs)",
-    "Brush(Night)",
+    "Brush and face wash(Night)",
     "Sleep at 11PM"
   ],
   "records": {
@@ -76,27 +80,66 @@
       },
       "Brush(Mrng)": {
         "16": true,
-        "15": false
+        "15": false,
+        "20": false,
+        "18": false,
+        "17": false
       },
       "Sleep at 11PM": {
-        "16": false
+        "16": false,
+        "18": false,
+        "17": false
       },
       "Study(2+ hrs)": {
         "16": false,
+        "17": false,
+        "18": false
+      },
+      "Anxiety Tablet": {
+        "16": true,
+        "20": false,
+        "18": false,
         "17": false
       },
-      "Brush(Night)": {
+      "Bath(within 20min)": {
+        "16": true,
+        "20": false,
+        "18": false,
+        "17": false
+      },
+      "Infection tablet": {
+        "16": true,
+        "20": false,
+        "18": false,
+        "17": false
+      },
+      "Breakfast": {
+        "20": false,
+        "18": false,
+        "16": false,
         "17": false,
-        "15": false
+        "11": false
+      },
+      "Brush and face wash(Night)": {
+        "17": false,
+        "15": false,
+        "16": true,
+        "18": false
       }
     }
   },
   "goal": "Being Productive",
   "moods": {
-    "2026-11": {}
+    "2026-11": {
+      "16": "Stressed 😤"
+    }
   },
   "bad_habits": [
-    "Slept Late (12am+)"
+    "Did'nt go to clg",
+    "Slept Late (12am+)",
+    "PUBG",
+    "Goon",
+    "Insta 2+ hrs"
   ],
   "bad_records": {
     "2026-11": {
@@ -113,9 +156,32 @@
         "16": false
       },
       "Slept Late (12am+)": {
+        "16": true,
+        "15": true,
+        "17": true
+      },
+      "Goon": {
+        "15": true,
+        "16": true,
+        "17": false
+      },
+      "PUBG": {
+        "15": true,
+        "12": false,
+        "17": false
+      },
+      "Did'nt go to clg": {
         "16": false,
-        "15": true
+        "17": true
+      },
+      "Insta 2+ hrs": {
+        "16": true,
+        "15": true,
+        "17": false
       }
     }
+  },
+  "notes": {
+    "To Do": "1.Insta limit Started on 17/11/26 completly stopped within 20 days ie 7/12/26 (or just 10 min a day)\n2."
   }
 }

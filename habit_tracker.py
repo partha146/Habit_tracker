@@ -58,6 +58,7 @@ def load_data() -> dict:
         # migrate: ensure bad-habits keys exist
         d.setdefault("bad_habits",  DEFAULT_BAD_HABITS[:])
         d.setdefault("bad_records", {})
+        d.setdefault("notes", {})
         return d
     return {
         "habits":      DEFAULT_HABITS[:],
@@ -66,6 +67,7 @@ def load_data() -> dict:
         "moods":       {},
         "bad_habits":  DEFAULT_BAD_HABITS[:],
         "bad_records": {},
+        "notes":       {},
     }
 
 def save_data(data: dict):
@@ -122,7 +124,8 @@ class HabitTrackerApp(tk.Tk):
         self.today = datetime.date.today()
         self.cur_year  = self.today.year
         self.cur_month = self.today.month
-        self.active_tab = "good"   # "good" | "bad"
+        self.active_tab = "good"   # "good" | "bad" | "notes"
+        self.allow_edit_past = False  # OFF by default; allows editing past tasks/mood when ON
 
         self.overrideredirect(True)
         self.state("zoomed")
@@ -156,18 +159,18 @@ class HabitTrackerApp(tk.Tk):
         top.bind("<Button-1>",  self._win_drag_start)
         top.bind("<B1-Motion>", self._win_drag_move)
 
-        # Window controls (right, first so they anchor right)
+        # Window controls (right, first so they anchor right: order left-to-right: — , ⛶ , ✕)
         ctrl = tk.Frame(top, bg=BG_HEADER)
         ctrl.pack(side="right", padx=8)
         tk.Button(ctrl, text=" ✕ ", command=self._on_close,
                   font=("Segoe UI", 11), bg=BG_HEADER, fg="#FF5F57",
                   activebackground="#FF5F57", activeforeground="white",
                   relief="flat", cursor="hand2").pack(side="right", padx=2)
-        tk.Button(ctrl, text=" — ", command=self._win_minimise,
+        tk.Button(ctrl, text=" ⛶ ", command=self._win_toggle_max,
                   font=("Segoe UI", 11), bg=BG_HEADER, fg=TEXT_MUTED,
                   activebackground=BG_CARD, activeforeground="white",
                   relief="flat", cursor="hand2").pack(side="right", padx=2)
-        tk.Button(ctrl, text=" ⛶ ", command=self._win_toggle_max,
+        tk.Button(ctrl, text=" — ", command=self._win_minimise,
                   font=("Segoe UI", 11), bg=BG_HEADER, fg=TEXT_MUTED,
                   activebackground=BG_CARD, activeforeground="white",
                   relief="flat", cursor="hand2").pack(side="right", padx=2)
@@ -197,7 +200,7 @@ class HabitTrackerApp(tk.Tk):
         tab_bar.pack(side="left", padx=20)
 
         self._tab_btns = {}
-        tabs = [("good", "🌟  Good Habits"), ("bad", "⚠️  Bad Habits")]
+        tabs = [("good", "🌟  Good Habits"), ("bad", "⚠️  Bad Habits"), ("notes", "📝  Notes")]
         for tab_id, label in tabs:
             btn = tk.Button(
                 tab_bar, text=label, font=FS,
@@ -207,18 +210,6 @@ class HabitTrackerApp(tk.Tk):
             btn.pack(side="left", padx=3)
             self._tab_btns[tab_id] = btn
         self._update_tab_styles()
-
-        # Focus badge
-        self.goal_var = tk.StringVar(value=self.data.get("goal", "Being Productive"))
-        gf = tk.Frame(top, bg=ACCENT, padx=10, pady=4)
-        gf.pack(side="left", padx=10)
-        tk.Label(gf, text="FOCUS:", font=FS, bg=ACCENT, fg="white").pack(side="left")
-        ge = tk.Entry(gf, textvariable=self.goal_var, font=FS,
-                      bg=ACCENT, fg="white", insertbackground="white",
-                      relief="flat", width=22)
-        ge.pack(side="left", padx=(4, 0))
-        ge.bind("<Return>",   lambda e: self._save_goal())
-        ge.bind("<FocusOut>", lambda e: self._save_goal())
 
         # Body
         body = tk.Frame(self, bg=BG_DARK)
@@ -241,13 +232,23 @@ class HabitTrackerApp(tk.Tk):
         # Rebuild sidebar for new tab
         for w in self.sidebar.winfo_children():
             w.destroy()
-        self._build_sidebar(self.sidebar)
-        self.refresh_grid()
+        if tab_id == "notes":
+            self._build_notes_sidebar(self.sidebar)
+            self._show_notes()
+        else:
+            self._build_sidebar(self.sidebar)
+            self.refresh_grid()
 
     def _update_tab_styles(self):
+        note_color = "#F59E0B"  # amber for notes tab
         for tab_id, btn in self._tab_btns.items():
             if tab_id == self.active_tab:
-                btn.config(bg=ACCENT, fg="white", activebackground=ACCENT2, activeforeground="white")
+                if tab_id == "notes":
+                    btn.config(bg=note_color, fg="white", activebackground="#D97706", activeforeground="white")
+                elif tab_id == "bad":
+                    btn.config(bg=FAIL_CLR, fg="white", activebackground="#DC2626", activeforeground="white")
+                else:
+                    btn.config(bg=ACCENT, fg="white", activebackground=ACCENT2, activeforeground="white")
             else:
                 btn.config(bg=BG_CARD, fg=TEXT_MUTED, activebackground=BG_HEADER, activeforeground=TEXT_WHITE)
 
@@ -324,6 +325,18 @@ class HabitTrackerApp(tk.Tk):
                                     fg=FAIL_CLR if is_bad else ACCENT2, justify="left")
         self.stats_label.pack(padx=10, fill="x")
 
+        # Quick lock indicator / button at bottom of sidebar
+        self.sidebar_lock_lbl = tk.Label(
+            parent,
+            text="🔓 Past: Editable" if self.allow_edit_past else "🔒 Past: Locked",
+            font=("Segoe UI", 8, "bold"),
+            bg=BG_CARD,
+            fg="#10B981" if self.allow_edit_past else TEXT_MUTED,
+            cursor="hand2"
+        )
+        self.sidebar_lock_lbl.pack(side="bottom", pady=8, padx=6)
+        self.sidebar_lock_lbl.bind("<Button-1>", lambda e: self._toggle_allow_edit_past())
+
     # ── Drag-and-drop ──────────────────────────────────────────────────────────
     def _habits_list(self):
         return self.data["bad_habits"] if self.active_tab == "bad" else self.data["habits"]
@@ -397,6 +410,11 @@ class HabitTrackerApp(tk.Tk):
     # Grid rebuild
     # ═══════════════════════════════════════════════════════════════════════════
     def refresh_grid(self):
+        # Notes tab has its own renderer
+        if self.active_tab == "notes":
+            self._show_notes()
+            return
+
         for w in self.inner.winfo_children():
             w.destroy()
         self.today = datetime.date.today()
@@ -441,6 +459,15 @@ class HabitTrackerApp(tk.Tk):
         today_d = self.today.day if y==self.today.year and m==self.today.month else -1
 
         def day_bg(base, d): return TODAY_TINT if d == today_d else base
+
+        def is_day_editable(d):
+            if y == self.today.year and m == self.today.month and d == today_d:
+                return True
+            if self.allow_edit_past:
+                if y < self.today.year: return True
+                if y == self.today.year and m < self.today.month: return True
+                if y == self.today.year and m == self.today.month and d < self.today.day: return True
+            return False
 
         # ── Date header ───────────────────────────────────────────────────────
         hdr_title = "BAD HABITS / TO AVOID" if is_bad else "HABIT / ROUTINE"
@@ -504,7 +531,7 @@ class HabitTrackerApp(tk.Tk):
                     font=("Segoe UI", 10, "bold") if checked else ("Segoe UI", 12),
                     bg=cell_bg,
                     fg=("white" if checked else (ACCENT2 if d==today_d else GRID_LINE)),
-                    anchor="center", cursor="hand2")
+                    anchor="center", cursor="hand2" if is_day_editable(d) else "arrow")
                 cell.grid(row=crow, column=d, sticky="ew", padx=1, pady=2)
                 cell.bind("<Button-1>",
                           lambda e, h=habit, day=d, v=var, c=cell, rb=row_bg:
@@ -519,9 +546,54 @@ class HabitTrackerApp(tk.Tk):
             self._pill_labels[habit] = pill
             crow += 1
 
+        # ── Per-day summary rows (tasks left + % done) ────────────────────────
+        n_habits = len(habits)
+        self._left_labels = {}   # day → Label (tasks left / done count)
+        self._pct_labels  = {}   # day → Label (% done / % slipped)
+
+        # Row: "Left" — how many habits still unchecked each day
+        left_label = "Bad acts" if is_bad else "Tasks left"
+        tk.Label(G, text=left_label, font=FS, bg=BG_HEADER,
+                 fg=TEXT_MUTED, anchor="w", padx=8).grid(
+            row=crow, column=0, sticky="ew", ipady=4)
+        for d in range(1, dim+1):
+            done_d = sum(1 for h in habits if records.get(h,{}).get(str(d), False))
+            left_d = n_habits - done_d
+            if is_bad:
+                val_txt = str(done_d)
+                val_fg  = FAIL_CLR if done_d > 0 else TEXT_MUTED
+            else:
+                val_txt = str(left_d)
+                val_fg  = "#4ADE80" if left_d == 0 else (WARN_CLR if left_d <= 2 else FAIL_CLR)
+            lbl = tk.Label(G, text=val_txt if n_habits else "—", font=("Segoe UI", 9, "bold"),
+                           bg=day_bg(BG_HEADER, d), fg=val_fg, anchor="center")
+            lbl.grid(row=crow, column=d, sticky="ew", padx=1, ipady=4)
+            self._left_labels[d] = lbl
+        tk.Label(G, text="", bg=BG_HEADER).grid(row=crow, column=dim+1, sticky="ew")
+        crow += 1
+
+        # Row: "% done" — matches the chart values exactly
+        pct_label = "% slipped" if is_bad else "% done"
+        tk.Label(G, text=pct_label, font=FS, bg=BG_HEADER,
+                 fg=TEXT_MUTED, anchor="w", padx=8).grid(
+            row=crow, column=0, sticky="ew", ipady=4)
+        for d in range(1, dim+1):
+            done_d = sum(1 for h in habits if records.get(h,{}).get(str(d), False))
+            pct_d  = int(done_d / n_habits * 100) if n_habits else 0
+            if is_bad:
+                val_fg = FAIL_CLR if pct_d >= 50 else (WARN_CLR if pct_d > 0 else "#4ADE80")
+            else:
+                val_fg = "#4ADE80" if pct_d >= 70 else (WARN_CLR if pct_d >= 40 else FAIL_CLR)
+            lbl = tk.Label(G, text=f"{pct_d}%" if n_habits else "—", font=("Segoe UI", 9, "bold"),
+                           bg=day_bg(BG_HEADER, d), fg=val_fg, anchor="center")
+            lbl.grid(row=crow, column=d, sticky="ew", padx=1, ipady=4)
+            self._pct_labels[d] = lbl
+        tk.Label(G, text="", bg=BG_HEADER).grid(row=crow, column=dim+1, sticky="ew")
+        crow += 1
+
         # ── Progress chart ─────────────────────────────────────────────────────
         crow = divider(crow, GRID_LINE, 1)
-        n_habits = len(habits)
+        # n_habits already defined in summary rows above
         day_pct = [
             int(sum(1 for h in habits if records.get(h,{}).get(str(d),False)) / n_habits * 100)
             if n_habits else 0
@@ -553,7 +625,7 @@ class HabitTrackerApp(tk.Tk):
                     dot = tk.Label(G, text="●" if selected else "○", font=FEM,
                                    bg=day_bg(row_bg, d),
                                    fg=mcolor if selected else GRID_LINE,
-                                   anchor="center", cursor="hand2")
+                                   anchor="center", cursor="hand2" if is_day_editable(d) else "arrow")
                     dot.grid(row=crow, column=d, sticky="ew", padx=1, pady=2)
                     dot.bind("<Button-1>", lambda e, mo=mood, day=d: self._set_mood(mo, day))
                     self._mood_dots[(d, mi)] = dot
@@ -569,6 +641,10 @@ class HabitTrackerApp(tk.Tk):
             self._mg_frame = mg_frame
         else:
             self._mg_frame = None
+
+        # ── Bottom Switch: Allow editing previous days' tasks or mood ──────────
+        crow = divider(crow, GRID_LINE, 1)
+        crow = self._build_past_edit_switch(G, crow, dim, is_bad)
 
         # Store chart context
         self._chart_dim    = dim
@@ -795,6 +871,21 @@ class HabitTrackerApp(tk.Tk):
     # Toggle helpers
     # ═══════════════════════════════════════════════════════════════════════════
     def _toggle_cell(self, habit, day, var, cell_label, row_bg, dim, chk_accent):
+        y, m = self.cur_year, self.cur_month
+        today_d = self.today.day if (y == self.today.year and m == self.today.month) else -1
+        is_today = (day == today_d)
+        is_past = (y < self.today.year or 
+                   (y == self.today.year and m < self.today.month) or
+                   (y == self.today.year and m == self.today.month and day < self.today.day))
+
+        if not is_today:
+            if not self.allow_edit_past:
+                if is_past:
+                    self._notify_past_locked(f"🔒 Day {day} is locked (past date). Turn ON switch below to edit past tasks.")
+                else:
+                    self._notify_past_locked(f"Day {day} is in the future and cannot be marked yet.")
+                return
+
         new_val = not var.get(); var.set(new_val)
         mk = month_key(self.cur_year, self.cur_month)
         is_bad = (self.active_tab == "bad")
@@ -822,11 +913,53 @@ class HabitTrackerApp(tk.Tk):
         if habit in self._pill_labels:
             self._pill_labels[habit].config(text=str(total), bg=pill_bg)
 
+        # Update summary rows for this day
+        habits = self._habits_list()
+        n_habits = len(habits)
+        done_d = sum(1 for h in habits if records.get(h,{}).get(str(day), False))
+        left_d = n_habits - done_d
+        pct_d  = int(done_d / n_habits * 100) if n_habits else 0
+
+        if hasattr(self, "_left_labels") and day in self._left_labels:
+            lbl = self._left_labels[day]
+            if lbl.winfo_exists():
+                if is_bad:
+                    val_txt = str(done_d)
+                    val_fg  = FAIL_CLR if done_d > 0 else TEXT_MUTED
+                else:
+                    val_txt = str(left_d)
+                    val_fg  = "#4ADE80" if left_d == 0 else (WARN_CLR if left_d <= 2 else FAIL_CLR)
+                lbl.config(text=val_txt if n_habits else "—", fg=val_fg)
+
+        if hasattr(self, "_pct_labels") and day in self._pct_labels:
+            lbl = self._pct_labels[day]
+            if lbl.winfo_exists():
+                if is_bad:
+                    val_fg = FAIL_CLR if pct_d >= 50 else (WARN_CLR if pct_d > 0 else "#4ADE80")
+                else:
+                    val_fg = "#4ADE80" if pct_d >= 70 else (WARN_CLR if pct_d >= 40 else FAIL_CLR)
+                lbl.config(text=f"{pct_d}%" if n_habits else "—", fg=val_fg)
+
         self._update_stats(records, self._habits_list(), dim, is_bad)
         self._redraw_charts()
 
     def _set_mood(self, mood, day):
         """Toggle mood for a day — no full grid refresh."""
+        y, m = self.cur_year, self.cur_month
+        today_d = self.today.day if (y == self.today.year and m == self.today.month) else -1
+        is_today = (day == today_d)
+        is_past = (y < self.today.year or 
+                   (y == self.today.year and m < self.today.month) or
+                   (y == self.today.year and m == self.today.month and day < self.today.day))
+
+        if not is_today:
+            if not self.allow_edit_past:
+                if is_past:
+                    self._notify_past_locked(f"🔒 Day {day} mood is locked (past date). Turn ON switch below to edit past mood.")
+                else:
+                    self._notify_past_locked(f"Day {day} is in the future.")
+                return
+
         mk = month_key(self.cur_year, self.cur_month)
         m  = self.data["moods"].setdefault(mk, {})
         old_mood = m.get(str(day))
@@ -852,6 +985,78 @@ class HabitTrackerApp(tk.Tk):
             moods = self.data["moods"].get(mk, {})
             for w in self._mg_frame.winfo_children(): w.destroy()
             self._draw_mood_chart(self._mg_frame, moods, dim)
+
+    # ─── Past day editing switch helpers ───────────────────────────────────────
+    def _build_past_edit_switch(self, G, crow, dim, is_bad):
+        sw_card = tk.Frame(G, bg=BG_CARD, padx=16, pady=10)
+        sw_card.grid(row=crow, column=0, columnspan=dim+2, sticky="ew", padx=0, pady=(8, 16))
+        crow += 1
+
+        info_col = tk.Frame(sw_card, bg=BG_CARD)
+        info_col.pack(side="left", fill="x", expand=True)
+
+        top_line = tk.Frame(info_col, bg=BG_CARD)
+        top_line.pack(anchor="w")
+
+        icon_char = "🔓" if self.allow_edit_past else "🔒"
+        icon_fg   = "#10B981" if self.allow_edit_past else TEXT_MUTED
+        self._sw_icon_lbl = tk.Label(top_line, text=icon_char, font=("Segoe UI", 12),
+                                     bg=BG_CARD, fg=icon_fg)
+        self._sw_icon_lbl.pack(side="left", padx=(0, 6))
+
+        tk.Label(top_line, text="Allow editing previous days' tasks or mood",
+                 font=("Segoe UI", 10, "bold"), bg=BG_CARD, fg=TEXT_WHITE).pack(side="left")
+
+        desc_txt = ("ON — You can now edit past days' tasks and mood to correct errors/misclicks."
+                    if self.allow_edit_past else
+                    "OFF — Previous days are protected against accidental clicks. Turn ON to fix an error from yesterday.")
+        desc_fg  = "#4ADE80" if self.allow_edit_past else TEXT_MUTED
+        self._sw_desc_lbl = tk.Label(info_col, text=desc_txt, font=FS,
+                                     bg=BG_CARD, fg=desc_fg)
+        self._sw_desc_lbl.pack(anchor="w", pady=(2, 0))
+
+        self._sw_notice_lbl = tk.Label(info_col, text="", font=("Segoe UI", 9, "bold"),
+                                       bg=BG_CARD, fg=WARN_CLR)
+        self._sw_notice_lbl.pack(anchor="w", pady=(2, 0))
+
+        # Right side: Interactive Toggle Switch Button
+        active_color = FAIL_CLR if is_bad else ACCENT
+        btn_bg = active_color if self.allow_edit_past else "#252540"
+        btn_fg = "white" if self.allow_edit_past else TEXT_MUTED
+        btn_txt = "  ON  ●  " if self.allow_edit_past else "  ○  OFF  "
+
+        self._sw_btn = tk.Button(
+            sw_card, text=btn_txt, font=("Segoe UI", 9, "bold"),
+            bg=btn_bg, fg=btn_fg, relief="flat", cursor="hand2",
+            activebackground=active_color, activeforeground="white",
+            padx=14, pady=6,
+            command=self._toggle_allow_edit_past
+        )
+        self._sw_btn.pack(side="right", padx=6)
+        return crow
+
+    def _toggle_allow_edit_past(self):
+        self.allow_edit_past = not self.allow_edit_past
+        self.refresh_grid()
+
+    def _notify_past_locked(self, msg):
+        if hasattr(self, "_sw_notice_lbl") and self._sw_notice_lbl and self._sw_notice_lbl.winfo_exists():
+            self._sw_notice_lbl.config(text=msg)
+            self.after(3500, lambda: self._clear_past_notice(msg))
+        if hasattr(self, "sidebar_lock_lbl") and self.sidebar_lock_lbl and self.sidebar_lock_lbl.winfo_exists():
+            orig_text = self.sidebar_lock_lbl.cget("text")
+            orig_fg   = self.sidebar_lock_lbl.cget("fg")
+            self.sidebar_lock_lbl.config(text="⚠️ Past days locked!\nTurn switch ON to edit", fg=WARN_CLR)
+            self.after(3500, lambda: self._restore_sidebar_lock_lbl(orig_text, orig_fg))
+
+    def _clear_past_notice(self, msg):
+        if hasattr(self, "_sw_notice_lbl") and self._sw_notice_lbl and self._sw_notice_lbl.winfo_exists():
+            if self._sw_notice_lbl.cget("text") == msg:
+                self._sw_notice_lbl.config(text="")
+
+    def _restore_sidebar_lock_lbl(self, text, fg):
+        if hasattr(self, "sidebar_lock_lbl") and self.sidebar_lock_lbl and self.sidebar_lock_lbl.winfo_exists():
+            self.sidebar_lock_lbl.config(text=text, fg=fg)
 
     # ═══════════════════════════════════════════════════════════════════════════
     # Stats
@@ -964,13 +1169,198 @@ class HabitTrackerApp(tk.Tk):
             self.data["bad_habits"].pop(sel[0]); save_data(self.data); self.refresh_grid()
 
     # ═══════════════════════════════════════════════════════════════════════════
+    # Notes tab
+    # ═══════════════════════════════════════════════════════════════════════════
+    def _build_notes_sidebar(self, parent):
+        tk.Label(parent, text="NOTES", font=FH, bg=BG_CARD, fg="#F59E0B",
+                 pady=14).pack(fill="x", padx=10)
+
+        tk.Label(parent, text="Pages", font=FS, bg=BG_CARD, fg=TEXT_MUTED).pack(pady=(4,2))
+        lf = tk.Frame(parent, bg=BG_CARD)
+        lf.pack(fill="both", expand=True, padx=6)
+
+        self.notes_listbox = tk.Listbox(
+            lf, bg=BG_CARD, fg=TEXT_WHITE, font=FS,
+            selectbackground="#F59E0B", selectforeground="white",
+            relief="flat", activestyle="none", bd=0, highlightthickness=0, cursor="hand2",
+        )
+        self.notes_listbox.pack(fill="both", expand=True)
+        self.notes_listbox.bind("<<ListboxSelect>>", self._on_note_select)
+
+        bf = tk.Frame(parent, bg=BG_CARD, pady=8)
+        bf.pack(fill="x", padx=6)
+        for txt, cmd in [("+ New Page", self._add_note_page),
+                         ("✎ Rename",   self._rename_note_page),
+                         ("✕ Delete",   self._delete_note_page)]:
+            tk.Button(bf, text=txt, command=cmd, font=FS,
+                      bg=BG_DARK, fg=TEXT_WHITE, relief="flat", pady=5,
+                      activebackground="#F59E0B", activeforeground="white",
+                      cursor="hand2").pack(fill="x", pady=2)
+
+        # populate list
+        self._refresh_notes_list()
+
+    def _refresh_notes_list(self):
+        notes = self.data.get("notes", {})
+        lb = self.notes_listbox
+        lb.delete(0, "end")
+        for title in notes.keys():
+            lb.insert("end", f"  {title}")
+        # select the active note if any
+        active = getattr(self, "_active_note", None)
+        if active and active in list(notes.keys()):
+            idx = list(notes.keys()).index(active)
+            lb.selection_clear(0, "end")
+            lb.selection_set(idx)
+
+    def _show_notes(self):
+        """Replace scroll-area content with the notes editor."""
+        for w in self.inner.winfo_children():
+            w.destroy()
+        self._update_canvas_width()
+
+        notes = self.data.setdefault("notes", {})
+        if not notes:
+            # Create a default page
+            notes["Page 1"] = ""
+            save_data(self.data)
+
+        # Pick active note
+        if not hasattr(self, "_active_note") or self._active_note not in notes:
+            self._active_note = next(iter(notes))
+
+        self._refresh_notes_list()
+
+        # ── Editor area ──────────────────────────────────────────────────────
+        outer = tk.Frame(self.inner, bg=BG_DARK)
+        outer.pack(fill="both", expand=True, padx=16, pady=12)
+
+        # Title bar for the page
+        title_row = tk.Frame(outer, bg=BG_CARD, padx=12, pady=8)
+        title_row.pack(fill="x", pady=(0, 8))
+        tk.Label(title_row, text="📝", font=("Segoe UI", 16), bg=BG_CARD, fg="#F59E0B").pack(side="left", padx=(0,8))
+        self._note_title_lbl = tk.Label(
+            title_row, text=self._active_note,
+            font=("Segoe UI", 16, "bold"), bg=BG_CARD, fg=TEXT_WHITE, anchor="w")
+        self._note_title_lbl.pack(side="left", fill="x", expand=True)
+        tk.Label(title_row, text="auto-saved", font=FXS, bg=BG_CARD, fg=TEXT_MUTED).pack(side="right")
+
+        # Text editor
+        editor_frame = tk.Frame(outer, bg=BG_CARD, bd=0)
+        editor_frame.pack(fill="both", expand=True)
+
+        v_sb = tk.Scrollbar(editor_frame, orient="vertical", bg=BG_CARD)
+        v_sb.pack(side="right", fill="y")
+
+        self._note_editor = tk.Text(
+            editor_frame,
+            bg=BG_CARD, fg=TEXT_WHITE,
+            insertbackground=ACCENT2,
+            font=("Segoe UI", 12),
+            relief="flat", bd=0,
+            wrap="word",
+            padx=16, pady=12,
+            spacing1=4, spacing3=4,
+            yscrollcommand=v_sb.set,
+            highlightthickness=0,
+        )
+        self._note_editor.pack(fill="both", expand=True)
+        v_sb.config(command=self._note_editor.yview)
+
+        # Load content
+        self._note_editor.insert("1.0", notes.get(self._active_note, ""))
+        self._note_editor.bind("<KeyRelease>", self._autosave_note)
+
+    def _autosave_note(self, event=None):
+        if not hasattr(self, "_active_note"): return
+        content = self._note_editor.get("1.0", "end-1c")
+        self.data.setdefault("notes", {})[self._active_note] = content
+        save_data(self.data)
+
+    def _on_note_select(self, event=None):
+        """Switch to the selected note page."""
+        lb = self.notes_listbox
+        sel = lb.curselection()
+        if not sel: return
+        # save current
+        if hasattr(self, "_note_editor") and self._note_editor.winfo_exists():
+            self._autosave_note()
+        notes = self.data.get("notes", {})
+        keys  = list(notes.keys())
+        idx   = sel[0]
+        if idx < len(keys):
+            self._active_note = keys[idx]
+            self._show_notes()
+
+    def _add_note_page(self):
+        name = simpledialog.askstring("New Page", "Page name:", parent=self)
+        if not name or not name.strip(): return
+        name = name.strip()
+        self.data.setdefault("notes", {})[name] = ""
+        self._active_note = name
+        save_data(self.data)
+        self._refresh_notes_list()
+        self._show_notes()
+
+    def _rename_note_page(self):
+        lb = self.notes_listbox; sel = lb.curselection()
+        if not sel: messagebox.showinfo("Select", "Select a page first.", parent=self); return
+        notes = self.data.get("notes", {}); keys = list(notes.keys())
+        old = keys[sel[0]]
+        new = simpledialog.askstring("Rename", "New name:", initialvalue=old, parent=self)
+        if not new or not new.strip() or new.strip() == old: return
+        new = new.strip()
+        # Rebuild dict preserving order
+        self.data["notes"] = {(new if k==old else k): v for k, v in notes.items()}
+        self._active_note = new
+        save_data(self.data)
+        self._refresh_notes_list()
+        if hasattr(self, "_note_title_lbl") and self._note_title_lbl.winfo_exists():
+            self._note_title_lbl.config(text=new)
+
+    def _delete_note_page(self):
+        lb = self.notes_listbox; sel = lb.curselection()
+        if not sel: messagebox.showinfo("Select", "Select a page first.", parent=self); return
+        notes = self.data.get("notes", {}); keys = list(notes.keys())
+        name = keys[sel[0]]
+        if not messagebox.askyesno("Delete", f'Delete page "{name}"?', parent=self): return
+        del self.data["notes"][name]
+        save_data(self.data)
+        # pick new active note
+        remaining = list(self.data["notes"].keys())
+        if remaining:
+            self._active_note = remaining[0]
+            self._refresh_notes_list()
+            self._show_notes()
+        else:
+            # no pages left — create one
+            self.data["notes"]["Page 1"] = ""
+            self._active_note = "Page 1"
+            save_data(self.data)
+            self._refresh_notes_list()
+            self._show_notes()
+
+    # Also handle refresh_grid when in notes tab
+    def _notes_aware_refresh(self):
+        if self.active_tab == "notes":
+            self._show_notes()
+        else:
+            self.refresh_grid()
+
+    # ═══════════════════════════════════════════════════════════════════════════
     # Misc
     # ═══════════════════════════════════════════════════════════════════════════
     def _save_goal(self):
-        self.data["goal"] = self.goal_var.get(); save_data(self.data)
+        pass   # focus badge removed; kept to avoid AttributeError from old bindings
 
     def _on_close(self):
-        save_data(self.data); self.destroy()
+        # auto-save any open note before closing
+        if self.active_tab == "notes" and hasattr(self, "_note_editor"):
+            try: self._autosave_note()
+            except Exception: pass
+        save_data(self.data)
+        self.destroy()
+        sys.exit(0)
 
 # ─── Entry point ──────────────────────────────────────────────────────────────
 if __name__ == "__main__":
