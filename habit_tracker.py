@@ -59,15 +59,19 @@ def load_data() -> dict:
         d.setdefault("bad_habits",  DEFAULT_BAD_HABITS[:])
         d.setdefault("bad_records", {})
         d.setdefault("notes", {})
+        d.setdefault("habit_weights", {})
+        d.setdefault("bad_habit_weights", {})
         return d
     return {
-        "habits":      DEFAULT_HABITS[:],
-        "records":     {},
-        "goal":        "Being Productive",
-        "moods":       {},
-        "bad_habits":  DEFAULT_BAD_HABITS[:],
-        "bad_records": {},
-        "notes":       {},
+        "habits":           DEFAULT_HABITS[:],
+        "records":          {},
+        "goal":             "Being Productive",
+        "moods":            {},
+        "bad_habits":       DEFAULT_BAD_HABITS[:],
+        "bad_records":      {},
+        "notes":            {},
+        "habit_weights":    {},
+        "bad_habit_weights":{},
     }
 
 def save_data(data: dict):
@@ -108,6 +112,8 @@ GRID_LINE  = "#2D2D44"
 ROW_ALT    = "#1E1E32"
 ROW_HOVER  = "#252540"
 TODAY_TINT = "#1E1245"
+IMP_ROW    = "#2E1A1A"   # red-tinted equivalent of BG_CARD (#1A1A2E)
+IMP_HOVER  = "#381F1F"   # slightly lighter red for hover on imp rows
 
 FT  = ("Segoe UI", 22, "bold")
 FH  = ("Segoe UI", 11, "bold")
@@ -305,6 +311,7 @@ class HabitTrackerApp(tk.Tk):
         lb.bind("<Button-1>",        self._drag_start)
         lb.bind("<B1-Motion>",       self._drag_motion)
         lb.bind("<ButtonRelease-1>", self._drag_drop)
+        lb.bind("<Button-3>", lambda e, is_b=is_bad: self._listbox_toggle_imp(e, is_b))
 
         tk.Label(parent, text="⠿ drag to reorder", font=("Segoe UI", 7),
                  bg=BG_CARD, fg=GRID_LINE).pack(pady=(0, 2))
@@ -431,9 +438,14 @@ class HabitTrackerApp(tk.Tk):
         moods   = self.data["moods"].get(mk, {})
 
         # sidebar list
+        is_bad_tab = (self.active_tab == "bad")
+        wt_store_sb = "bad_habit_weights" if is_bad_tab else "habit_weights"
         self.habit_listbox.delete(0, "end")
         for h in habits:
+            is_imp = self.data[wt_store_sb].get(h, "norm") == "imp"
             self.habit_listbox.insert("end", f"  {h}")
+            if is_imp:
+                self.habit_listbox.itemconfig("end", fg=TEXT_WHITE, bg=IMP_ROW)
 
         G = tk.Frame(self.inner, bg=BG_DARK)
         G.pack(fill="x", padx=4, pady=4)
@@ -507,16 +519,25 @@ class HabitTrackerApp(tk.Tk):
         # ── Habit rows ────────────────────────────────────────────────────────
         self.check_vars   = {}
         self._pill_labels = {}
+        self._imp_row_bgs = {}   # habit → base row_bg (for hover restore)
         chk_accent = FAIL_CLR if is_bad else ACCENT
+        wt_store = "bad_habit_weights" if is_bad else "habit_weights"
 
         for i, habit in enumerate(habits):
-            row_bg = BG_CARD if i%2==0 else ROW_ALT
+            is_imp = self.data[wt_store].get(habit, "norm") == "imp"
+            row_bg = IMP_ROW if is_imp else BG_CARD
+            self._imp_row_bgs[habit] = row_bg
             total  = 0
+            star   = ""
             lbl = tk.Label(G, text=f"{i+1}. {habit}", font=FB,
-                           bg=row_bg, fg=TEXT_WHITE, anchor="w", padx=8)
+                           bg=row_bg, fg=TEXT_WHITE,
+                           anchor="w", padx=8)
             lbl.grid(row=crow, column=0, sticky="ew", ipady=5)
-            lbl.bind("<Enter>", lambda e, r=crow: self._row_hover(G, r, dim, ROW_HOVER))
+            hover_bg = IMP_HOVER if is_imp else ROW_HOVER
+            lbl.bind("<Enter>", lambda e, r=crow, hb=hover_bg: self._row_hover(G, r, dim, hb))
             lbl.bind("<Leave>", lambda e, r=crow, c=row_bg: self._row_hover(G, r, dim, c))
+            lbl.bind("<Button-3>", lambda e, h=habit, is_b=is_bad: self._toggle_imp(h, is_b))
+            lbl.config(cursor="hand2")
 
             for d in range(1, dim+1):
                 checked = records.get(habit, {}).get(str(d), False)
@@ -536,7 +557,7 @@ class HabitTrackerApp(tk.Tk):
                 cell.bind("<Button-1>",
                           lambda e, h=habit, day=d, v=var, c=cell, rb=row_bg:
                           self._toggle_cell(h, day, v, c, rb, dim, chk_accent))
-                cell.bind("<Enter>", lambda e, r=crow: self._row_hover(G, r, dim, ROW_HOVER))
+                cell.bind("<Enter>", lambda e, r=crow, hb=hover_bg: self._row_hover(G, r, dim, hb))
                 cell.bind("<Leave>", lambda e, r=crow, c=row_bg: self._row_hover(G, r, dim, c))
 
             pct = int(total/dim*100)
@@ -545,7 +566,7 @@ class HabitTrackerApp(tk.Tk):
             pill = tk.Label(G, text=str(total), font=("Segoe UI", 10, "bold"),
                             bg=pill_bg, fg="white", anchor="center")
             pill.grid(row=crow, column=dim+1, sticky="ew", padx=(4,2), pady=2)
-            pill.bind("<Enter>", lambda e, r=crow: self._row_hover(G, r, dim, ROW_HOVER))
+            pill.bind("<Enter>", lambda e, r=crow, hb=hover_bg: self._row_hover(G, r, dim, hb))
             pill.bind("<Leave>", lambda e, r=crow, c=row_bg: self._row_hover(G, r, dim, c))
             self._pill_labels[habit] = pill
             crow += 1
@@ -554,6 +575,9 @@ class HabitTrackerApp(tk.Tk):
         n_habits = len(habits)
         self._left_labels = {}   # day → Label (tasks left / done count)
         self._pct_labels  = {}   # day → Label (% done / % slipped)
+
+        def _w(h): return 2 if self.data[wt_store].get(h,"norm")=="imp" else 1
+        total_w = sum(_w(h) for h in habits)  # total possible weighted points
 
         # Row: "Left" — how many habits still unchecked each day
         left_label = "Bad acts" if is_bad else "Tasks left"
@@ -576,14 +600,14 @@ class HabitTrackerApp(tk.Tk):
         tk.Label(G, text="", bg=BG_HEADER).grid(row=crow, column=dim+1, sticky="ew")
         crow += 1
 
-        # Row: "% done" — matches the chart values exactly
+        # Row: "% done" — weighted by importance
         pct_label = "% slipped" if is_bad else "% done"
         tk.Label(G, text=pct_label, font=FS, bg=BG_HEADER,
                  fg=TEXT_MUTED, anchor="w", padx=8).grid(
             row=crow, column=0, sticky="ew", ipady=4)
         for d in range(1, dim+1):
-            done_d = sum(1 for h in habits if records.get(h,{}).get(str(d), False))
-            pct_d  = int(done_d / n_habits * 100) if n_habits else 0
+            done_w = sum(_w(h) for h in habits if records.get(h,{}).get(str(d), False))
+            pct_d  = int(done_w / total_w * 100) if total_w else 0
             if is_bad:
                 val_fg = FAIL_CLR if pct_d >= 50 else (WARN_CLR if pct_d > 0 else "#4ADE80")
             else:
@@ -599,8 +623,8 @@ class HabitTrackerApp(tk.Tk):
         crow = divider(crow, GRID_LINE, 1)
         # n_habits already defined in summary rows above
         day_pct = [
-            int(sum(1 for h in habits if records.get(h,{}).get(str(d),False)) / n_habits * 100)
-            if n_habits else 0
+            int(sum(_w(h) for h in habits if records.get(h,{}).get(str(d),False)) / total_w * 100)
+            if total_w else 0
             for d in range(1, dim+1)
         ]
         area_frame = tk.Frame(G, bg=BG_CARD)
@@ -620,7 +644,7 @@ class HabitTrackerApp(tk.Tk):
             self._mood_dots = {}  # (day, mood_idx) → label widget
 
             for mi, (mood, mcolor) in enumerate(zip(MOOD_LEVELS, MOOD_COLORS)):
-                row_bg = BG_CARD if mi%2==0 else ROW_ALT
+                row_bg = BG_CARD
                 mlbl = tk.Label(G, text=mood, font=FB, bg=row_bg,
                          fg=mcolor, anchor="w", padx=8)
                 mlbl.grid(row=crow, column=0, sticky="ew", ipady=4)
@@ -887,6 +911,38 @@ class HabitTrackerApp(tk.Tk):
     # ═══════════════════════════════════════════════════════════════════════════
     # Toggle helpers
     # ═══════════════════════════════════════════════════════════════════════════
+    def _listbox_toggle_imp(self, event, is_bad):
+        """Right-click on sidebar listbox → show context menu to set imp/norm."""
+        lb = self.habit_listbox
+        idx = lb.nearest(event.y)
+        if idx < 0: return
+        habits = self._habits_list()
+        if idx >= len(habits): return
+        habit = habits[idx]
+        wt_store = "bad_habit_weights" if is_bad else "habit_weights"
+        cur = self.data[wt_store].get(habit, "norm")
+
+        menu = tk.Menu(self, tearoff=0,
+                       bg="#1E1A2E", fg=TEXT_WHITE,
+                       activebackground=ACCENT, activeforeground="white",
+                       relief="flat", bd=0, font=FB)
+        menu.add_command(
+            label="⭐  Important  (2× weight)",
+            command=lambda: self._set_imp(habit, "imp", is_bad),
+            foreground=ACCENT2 if cur == "imp" else TEXT_WHITE)
+        menu.add_command(
+            label="◻  Normal  (1× weight)",
+            command=lambda: self._set_imp(habit, "norm", is_bad),
+            foreground=TEXT_WHITE if cur == "norm" else TEXT_MUTED)
+        menu.tk_popup(event.x_root, event.y_root)
+
+    def _set_imp(self, habit, value, is_bad):
+        """Set habit importance and refresh grid immediately."""
+        wt_store = "bad_habit_weights" if is_bad else "habit_weights"
+        self.data[wt_store][habit] = value
+        save_data(self.data)
+        self.refresh_grid()
+
     def _toggle_cell(self, habit, day, var, cell_label, row_bg, dim, chk_accent):
         y, m = self.cur_year, self.cur_month
         today_d = self.today.day if (y == self.today.year and m == self.today.month) else -1
@@ -933,9 +989,13 @@ class HabitTrackerApp(tk.Tk):
         # Update summary rows for this day
         habits = self._habits_list()
         n_habits = len(habits)
+        wt_store = "bad_habit_weights" if is_bad else "habit_weights"
+        def _w(h): return 2 if self.data[wt_store].get(h,"norm")=="imp" else 1
+        total_w = sum(_w(h) for h in habits)
         done_d = sum(1 for h in habits if records.get(h,{}).get(str(day), False))
         left_d = n_habits - done_d
-        pct_d  = int(done_d / n_habits * 100) if n_habits else 0
+        done_w = sum(_w(h) for h in habits if records.get(h,{}).get(str(day), False))
+        pct_d  = int(done_w / total_w * 100) if total_w else 0
 
         if hasattr(self, "_left_labels") and day in self._left_labels:
             lbl = self._left_labels[day]

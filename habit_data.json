@@ -110,7 +110,7 @@
       "Bath(within 20min)": {
         "16": true,
         "20": false,
-        "18": true,
+        "18": false,
         "17": true,
         "19": true
       },
@@ -152,8 +152,7 @@
     "2026-11": {
       "16": "Stressed 😤",
       "17": "Normal 😐",
-      "18": "Normal 😐",
-      "19": "Normal 😐"
+      "18": "Normal 😐"
     }
   },
   "bad_habits": [
@@ -212,7 +211,16 @@
     }
   },
   "notes": {
-    "To Do": "1.Insta limit Started on 17/11/26 completly stopped within 20 days ie 7/12/26 (or just 10 min a day)\n2.Dentist\n3. Anxiety\n4. add tasks which has gaps(like cloth wash every 3 days)|| make priority/weight based for some task and color code it based on priority|| make size in notes bigger\n5. complete all types of clg workhighligh(light tint)the task row when moving cursor near it bc its easier to find as there are many rows",
+    "To Do": "1.Insta limit Started on 17/11/26 completly stopped within 20 days ie 7/12/26 (or just 10 min a day)\n2.Dentist\n3. Anxiety\n4. add tasks which has gaps(like cloth wash every 3 days)|| make priority/weight based for some task and color code it based on priority\n5. complete all types of clg workhighligh(light tint)the task row when moving cursor near it bc its easier to find as there are many rows",
     "fwef": ""
-  }
+  },
+  "habit_weights": {
+    "Go Outside": "norm",
+    "Brush(Mrng)": "norm",
+    "Anxiety Tablet": "norm",
+    "Breakfast": "norm",
+    "Study(2+ hrs)": "norm",
+    "Infection tablet": "imp"
+  },
+  "bad_habit_weights": {}
 }
