@@ -90,9 +90,9 @@ DEFAULT_BAD_HABITS = [
     "Slept Late (12am+)", "Wasted Time", "Overspending",
 ]
 
-MOOD_LEVELS = ["Awesome 🤩", "Good 😊", "Normal 😐", "Stressed 😤", "Tired 😴", "F**ked 😵"]
-MOOD_COLORS = ["#4CAF50",   "#8BC34A", "#FFC107",   "#FF9800",    "#F44336",  "#9C27B0"]
-MOOD_SCORES = [5, 4, 3, 2, 1, 0]
+MOOD_LEVELS = ["Awesome 🤩", "Good 😊", "Normal 😐", "Stressed 😤", "Tired/F**ked 😵"]
+MOOD_COLORS = ["#4CAF50",   "#8BC34A", "#FFC107",   "#FF9800",    "#F44336"]
+MOOD_SCORES = [4, 3, 2, 1, 0]
 
 # ─── Palette ──────────────────────────────────────────────────────────────────
 BG_DARK    = "#0F0F1A"
@@ -621,9 +621,11 @@ class HabitTrackerApp(tk.Tk):
 
             for mi, (mood, mcolor) in enumerate(zip(MOOD_LEVELS, MOOD_COLORS)):
                 row_bg = BG_CARD if mi%2==0 else ROW_ALT
-                tk.Label(G, text=mood, font=FB, bg=row_bg,
-                         fg=mcolor, anchor="w", padx=8).grid(
-                    row=crow, column=0, sticky="ew", ipady=4)
+                mlbl = tk.Label(G, text=mood, font=FB, bg=row_bg,
+                         fg=mcolor, anchor="w", padx=8)
+                mlbl.grid(row=crow, column=0, sticky="ew", ipady=4)
+                mlbl.bind("<Enter>", lambda e, r=crow: self._row_hover(G, r, dim, ROW_HOVER))
+                mlbl.bind("<Leave>", lambda e, r=crow, c=row_bg: self._row_hover(G, r, dim, c))
                 for d in range(1, dim+1):
                     selected = moods.get(str(d)) == mood
                     dot = tk.Label(G, text="●" if selected else "○", font=FEM,
@@ -632,8 +634,13 @@ class HabitTrackerApp(tk.Tk):
                                    anchor="center", cursor="hand2" if is_day_editable(d) else "arrow")
                     dot.grid(row=crow, column=d, sticky="ew", padx=1, pady=2)
                     dot.bind("<Button-1>", lambda e, mo=mood, day=d: self._set_mood(mo, day))
+                    dot.bind("<Enter>", lambda e, r=crow: self._row_hover(G, r, dim, ROW_HOVER))
+                    dot.bind("<Leave>", lambda e, r=crow, c=row_bg: self._row_hover(G, r, dim, c))
                     self._mood_dots[(d, mi)] = dot
-                tk.Label(G, text="", bg=row_bg).grid(row=crow, column=dim+1, sticky="ew")
+                end_lbl = tk.Label(G, text="", bg=row_bg)
+                end_lbl.grid(row=crow, column=dim+1, sticky="ew")
+                end_lbl.bind("<Enter>", lambda e, r=crow: self._row_hover(G, r, dim, ROW_HOVER))
+                end_lbl.bind("<Leave>", lambda e, r=crow, c=row_bg: self._row_hover(G, r, dim, c))
                 crow += 1
 
             # Mood area chart (same style as progress chart)
@@ -769,7 +776,7 @@ class HabitTrackerApp(tk.Tk):
                                       key=lambda i: abs(MOOD_SCORES[i]-avg_score))]
             tk.Label(hdr, text=f"avg: {avg_lbl.split()[0]}", font=("Segoe UI",11),
                      bg=BG_CARD, fg=ACCENT2).pack(side="right")
-        tk.Label(parent, text="Your mood score per day (5=Awesome → 0=F**ked).",
+        tk.Label(parent, text="Your mood score per day (4=Awesome → 0=Tired/F**ked).",
                  font=("Segoe UI", 8), bg=BG_CARD, fg=TEXT_MUTED).pack(anchor="w", padx=14)
 
         try:
@@ -802,7 +809,7 @@ class HabitTrackerApp(tk.Tk):
             ax.set_xticks(all_days)
             ax.set_xticklabels([str(d) for d in all_days], fontsize=6.5, color=TEXT_MUTED)
             ax.set_yticks(MOOD_SCORES)
-            ax.set_yticklabels(["F**ked","Tired","Stressed","Normal","Good","Awesome"],
+            ax.set_yticklabels(["Tired/F**ked","Stressed","Normal","Good","Awesome"],
                                fontsize=7, color=TEXT_MUTED)
             ax.tick_params(axis="both", length=0)
             for sp in ax.spines.values(): sp.set_color(GRID_LINE)
@@ -820,8 +827,8 @@ class HabitTrackerApp(tk.Tk):
         cv.pack(fill="x", padx=6, pady=4)
         cv.update_idletasks()
         W=cv.winfo_width() or 900; H,pl,pr,pt,pb=110,70,20,10,24
-        for i,label in enumerate(["F**ked","Tired","Stressed","Normal","Good","Awesome"]):
-            yy=pt+(5-i)/5*(H-pt-pb)
+        for i,label in enumerate(["Tired/F**ked","Stressed","Normal","Good","Awesome"]):
+            yy=pt+(4-i)/4*(H-pt-pb)
             cv.create_text(pl-4,yy,text=label,anchor="e",fill=TEXT_MUTED,font=FXS)
             cv.create_line(pl,yy,W-pr,yy,fill=GRID_LINE,dash=(2,4))
         xs,ys,cs=[],[],[]
@@ -829,7 +836,7 @@ class HabitTrackerApp(tk.Tk):
             mood=moods.get(str(d))
             if mood in MOOD_LEVELS:
                 idx=MOOD_LEVELS.index(mood)
-                x=pl+(d-1)/max(dim-1,1)*(W-pl-pr); y=pt+(5-MOOD_SCORES[idx])/5*(H-pt-pb)
+                x=pl+(d-1)/max(dim-1,1)*(W-pl-pr); y=pt+(4-MOOD_SCORES[idx])/4*(H-pt-pb)
                 xs.append(x); ys.append(y); cs.append(MOOD_COLORS[idx])
         if len(xs)>=2:
             pts=[]
@@ -1190,7 +1197,7 @@ class HabitTrackerApp(tk.Tk):
         lf.pack(fill="both", expand=True, padx=6)
 
         self.notes_listbox = tk.Listbox(
-            lf, bg=BG_CARD, fg=TEXT_WHITE, font=FS,
+            lf, bg=BG_CARD, fg=TEXT_WHITE, font=("Segoe UI", 11),
             selectbackground="#F59E0B", selectforeground="white",
             relief="flat", activestyle="none", bd=0, highlightthickness=0, cursor="hand2",
         )
