@@ -536,6 +536,8 @@ class HabitTrackerApp(tk.Tk):
                 cell.bind("<Button-1>",
                           lambda e, h=habit, day=d, v=var, c=cell, rb=row_bg:
                           self._toggle_cell(h, day, v, c, rb, dim, chk_accent))
+                cell.bind("<Enter>", lambda e, r=crow: self._row_hover(G, r, dim, ROW_HOVER))
+                cell.bind("<Leave>", lambda e, r=crow, c=row_bg: self._row_hover(G, r, dim, c))
 
             pct = int(total/dim*100)
             pill_bg = chk_accent if pct>=70 else (WARN_CLR if pct>=40 else FAIL_CLR)
@@ -543,6 +545,8 @@ class HabitTrackerApp(tk.Tk):
             pill = tk.Label(G, text=str(total), font=("Segoe UI", 10, "bold"),
                             bg=pill_bg, fg="white", anchor="center")
             pill.grid(row=crow, column=dim+1, sticky="ew", padx=(4,2), pady=2)
+            pill.bind("<Enter>", lambda e, r=crow: self._row_hover(G, r, dim, ROW_HOVER))
+            pill.bind("<Leave>", lambda e, r=crow, c=row_bg: self._row_hover(G, r, dim, c))
             self._pill_labels[habit] = pill
             crow += 1
 
@@ -861,11 +865,17 @@ class HabitTrackerApp(tk.Tk):
 
     # ─── Row hover ─────────────────────────────────────────────────────────────
     def _row_hover(self, G, grid_row, dim, color):
+        # Colours that belong to checked cells / today tint — don't overwrite them
+        _SKIP = {ACCENT, FAIL_CLR, WARN_CLR, TODAY_TINT}
         for col in range(dim+2):
             w = G.grid_slaves(row=grid_row, column=col)
             if w:
-                try: w[0].config(bg=color)
-                except tk.TclError: pass
+                try:
+                    cur = w[0].cget("bg")
+                    if cur not in _SKIP:
+                        w[0].config(bg=color)
+                except tk.TclError:
+                    pass
 
     # ═══════════════════════════════════════════════════════════════════════════
     # Toggle helpers

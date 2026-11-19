@@ -2,8 +2,10 @@
   "habits": [
     "Brush(Mrng)",
     "Bath(within 20min)",
+    "Check poty seat",
     "Breakfast",
     "Anxiety Tablet",
+    "Go Outside",
     "Infection tablet",
     "Study(2+ hrs)",
     "Brush and face wash(Night)",
@@ -82,8 +84,9 @@
         "16": true,
         "15": false,
         "20": false,
-        "18": false,
-        "17": false
+        "18": true,
+        "17": true,
+        "19": true
       },
       "Sleep at 11PM": {
         "16": false,
@@ -92,46 +95,63 @@
       },
       "Study(2+ hrs)": {
         "16": false,
-        "17": false,
-        "18": false
+        "17": true,
+        "18": true,
+        "19": true
       },
       "Anxiety Tablet": {
         "16": true,
         "20": false,
-        "18": false,
-        "17": false
+        "18": true,
+        "17": true,
+        "19": true
       },
       "Bath(within 20min)": {
         "16": true,
         "20": false,
-        "18": false,
-        "17": false
+        "18": true,
+        "17": true,
+        "19": true
       },
       "Infection tablet": {
         "16": true,
         "20": false,
-        "18": false,
-        "17": false
+        "18": true,
+        "17": true,
+        "19": true
       },
       "Breakfast": {
         "20": false,
         "18": false,
         "16": false,
         "17": false,
-        "11": false
+        "11": false,
+        "19": false
       },
       "Brush and face wash(Night)": {
-        "17": false,
+        "17": true,
         "15": false,
         "16": true,
-        "18": false
+        "18": true,
+        "19": false
+      },
+      "Go Outside": {
+        "18": true,
+        "19": true
+      },
+      "Check poty seat": {
+        "18": true,
+        "17": true,
+        "19": true
       }
     }
   },
   "goal": "Being Productive",
   "moods": {
     "2026-11": {
-      "16": "Stressed 😤"
+      "16": "Stressed 😤",
+      "17": "Normal 😐",
+      "18": "Normal 😐"
     }
   },
   "bad_habits": [
@@ -158,12 +178,14 @@
       "Slept Late (12am+)": {
         "16": true,
         "15": true,
-        "17": true
+        "17": true,
+        "18": true
       },
       "Goon": {
         "15": true,
         "16": true,
-        "17": false
+        "17": true,
+        "18": true
       },
       "PUBG": {
         "15": true,
@@ -171,17 +193,21 @@
         "17": false
       },
       "Did'nt go to clg": {
-        "16": false,
-        "17": true
+        "16": true,
+        "17": true,
+        "18": false,
+        "15": true
       },
       "Insta 2+ hrs": {
         "16": true,
         "15": true,
-        "17": false
+        "17": true,
+        "18": true
       }
     }
   },
   "notes": {
-    "To Do": "1.Insta limit Started on 17/11/26 completly stopped within 20 days ie 7/12/26 (or just 10 min a day)\n2."
+    "To Do": "1.Insta limit Started on 17/11/26 completly stopped within 20 days ie 7/12/26 (or just 10 min a day)\n2.Dentist\n3. Anxiety\n4. add tasks which has gaps(like cloth wash every 3 days)|| make priority/weight based for some task and color code it based on priority|| remove fucked|| make size in notes bigger|| make the rows highlight(highligh(light tint)the task row when moving cursor near it bc its easier to find as there are many rows)\n5. complete all types of clg workhighligh(light tint)the task row when moving cursor near it bc its easier to find as there are many rows",
+    "fwef": ""
   }
 }
